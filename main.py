@@ -9,6 +9,9 @@ MYSQL_CONNECTOR=None
 USERNAME="user1"
 USERTYPE="Администратор"
 SELECTED_TABLE_NAME=""
+SELECTED_TABLE_NAME_2=None
+selected_item=None
+COLUMNS_NAMES_ADMINISTER=()
 def showLoginMenu():
     global bigRectLOGIN
     entry1LOGIN.place(width=1082,height=75,x=419,y=346)
@@ -172,7 +175,7 @@ def hideClientsMenu():
 
 
 def showAdministerMenu():
-    global header
+    global header,SELECTED_TABLE_NAME_2
     header=canvas.create_rectangle(0,0,1920,50,fill="#DB9494")    
     buttonClients.configure(background="#DB9494",activebackground="#DB9494",command=lambda:{hideAdministerMenu(),showClientsMenu()})
     buttonCredits.configure(background="#DB9494",activebackground="#DB9494",command=lambda:{hideAdministerMenu(),showCreditsMenu()})
@@ -192,59 +195,113 @@ def showAdministerMenu():
     buttonAddElementADMINISTER.place(x=1535,y=83,width=367,height=105)
     labelChooseTableADMINISTER.place(x=19,y=93,width=309,height=42)  
     optionMenuTablesADMINISTER.place(x=388,y=93,width=228,height=42)
+    SELECTED_TABLE_NAME_2=SELECTED_TABLE_NAME.get()
     DisplayData()
 
 def DisplayData():
+    global selected_item
+    selected_item=None
+    treeView.delete(*treeView.get_children())
     treeView.place_forget()
+    treeView.place(x=51,y=352)
+    for i in range(len(COLUMNS_NAMES_ADMINISTER)):
+        treeView.heading(COLUMNS_NAMES_ADMINISTER[i],text=COLUMNS_NAMES_ADMINISTER[i])
+        treeView.column(COLUMNS_NAMES_ADMINISTER[i],width=200)
     with MYSQL_CONNECTOR.cursor(pymysql.cursors.Cursor) as cursor:
         nam=SELECTED_TABLE_NAME.get()
         print(nam)
         cursor.execute("SELECT * FROM cursach."+SELECTED_TABLE_NAME.get())
-        rows=cursor.fetchall()
-        treeView.pack(side="bottom")
+        rows=cursor.fetchall()          
         for row in rows:
             treeView.insert("","end",values=(row[0],row[1]))
+    
         
-            
+def item_selected(event):
+    global selected_item
+    selected_item=treeView.selection()
         
 
 
 def chooseTableADMINISTER():
-    DisplayData()
-    pass
+    global treeView,COLUMNS_NAMES_ADMINISTER,SELECTED_TABLE_NAME_2
+    SELECTED_TABLE_NAME_2=SELECTED_TABLE_NAME.get()
+    treeView.place_forget()
+    if(SELECTED_TABLE_NAME.get()=="userTypes"):
+        treeView=tk.ttk.Treeview(root,columns=("id","name"),show="headings",selectmode="browse")        
+        COLUMNS_NAMES_ADMINISTER=("id","name")
+        treeView.bind("<<TreeviewSelect>>",item_selected)
+        DisplayData()
+        
+    
 
 def deleteChosenADMINISTER():
-    pass
+    try:
+        if(selected_item==None):
+            tkinter.messagebox.showerror("Ошибка удаления!","Не выбрана строка для удаления!")
+            return
+        if(SELECTED_TABLE_NAME_2=="userTypes"):
+            item=treeView.item(selected_item)
+            treeView.selection_remove(selected_item)
+            insertQuery("DELETE FROM "+SELECTED_TABLE_NAME_2+" WHERE id="+str(item["values"][0])+";")        
+        DisplayData()
+
+            
+
+    except mysql.connector.Error as err:
+        tkinter.messagebox.showerror("Ошибка удаления","Ошибка удаления из БД!")
 
 def changeChosenADMINISTER():
-    pass
+    try:
+        if(selected_item==None):
+            tkinter.messagebox.showerror("Ошибка изменения!","Не выбрана строка для изменения!")
+            return
+        top=tk.Toplevel(root,background="white")    
+        top.title("Изменение элемента")
+        top.minsize(400,235)
+        top.maxsize(400,235)
+        tk.Label(top,text="Введите название типа пользователей \nдля изменения элемента:",justify='left',background="white").place(x=0,y=0)
+        ut=tk.Entry(top,background="#D9D9D9")
+        ut.place(x=0,y=50)        
+        item=treeView.item(selected_item)   
+        if(SELECTED_TABLE_NAME_2=="userTypes"):                   
+            tk.Button(top,text="Изменить",activebackground="#DB9494",background="#DB9494",
+                  command=lambda: {insertQuery("UPDATE cursach."+SELECTED_TABLE_NAME_2+" SET name=\""+ut.get()+"\" WHERE id="+str(item["values"][0])) }).place(x=0,y=200)
+        DisplayData()
+
+            
+
+    except mysql.connector.Error as err:
+        tkinter.messagebox.showerror("Ошибка изменения","Ошибка изменения элемента в БД!")
 
 def insertQuery(query):
     cur=MYSQL_CONNECTOR.cursor()
     cur.execute(query)
     MYSQL_CONNECTOR.commit()
+    DisplayData()
 
 
 def addElementADMINISTER():
     top=tk.Toplevel(root,background="white")    
-    if(SELECTED_TABLE_NAME.get()=="userTypes"):
-        top.minsize(400,400)
-        top.maxsize(400,400)
+    top.title("Добавление элемента")
+    if(SELECTED_TABLE_NAME_2=="userTypes"):
+        top.minsize(400,235)
+        top.maxsize(400,235)
         tk.Label(top,text="Введите название типа пользователей:",background="white").place(x=0,y=0)
         ut=tk.Entry(top,background="#D9D9D9")
         ut.place(x=0,y=50)
+
+        
         
         tk.Button(top,text="Создать",activebackground="#DB9494",background="#DB9494",
-                  command=lambda: {insertQuery("INSERT INTO cursach."+SELECTED_TABLE_NAME.get()+" (id, name) VALUES (0,\""+ut.get()+"\")") }).place(x=0,y=200)
+                  command=lambda: {insertQuery("INSERT INTO cursach."+SELECTED_TABLE_NAME_2+" (id, name) VALUES (0,\""+ut.get()+"\")") }).place(x=0,y=200)
 
     try:    
         top.transient(root)
         top.grab_set()
         top.focus_set()
-        top.wait_window()
-        DisplayData()
+        top.wait_window()        
     except mysql.connector.Error as err:
-        tkinter.messagebox.ERROR("Ошибка сохранения в БД!", "Проверьте, что все логическая целостность соблюдатся,\n все not-null значения не являются null,\n все уникальные значения остаются уникальными")
+        tkinter.messagebox.showerror("Ошибка сохранения в БД!", "Проверьте, что все логическая целостность соблюдатся,\n все not-null значения не являются null,\n все уникальные значения остаются уникальными")
 
 
 #Меню для администратора
@@ -254,6 +311,7 @@ buttonChangeChosenADMINISTER=tk.Button(text="Изменить выбранное
 buttonAddElementADMINISTER=tk.Button(text="Добавить элемент",font="Times 28",activebackground="#D9D9D9",background="#D9D9D9",command=addElementADMINISTER)
 labelChooseTableADMINISTER=tk.Label(text="Выберите таблицу:",font="Times 28",activebackground="white",background="white")
 treeView=tk.ttk.Treeview(root)
+
 SELECTED_TABLE_NAME=tk.StringVar(root)
 tables=("clients","credits","users","userTypes","pledges","timespans","overduePayments")
 SELECTED_TABLE_NAME.set("clients")
@@ -262,6 +320,7 @@ optionMenuTablesADMINISTER=tk.OptionMenu(root,SELECTED_TABLE_NAME,*tables)
 
 
 def hideAdministerMenu():
+    global SELECTED_TABLE_NAME_2,selected_item
     canvas.delete(header)
     buttonClients.place_forget()
     buttonCredits.place_forget()
@@ -275,6 +334,9 @@ def hideAdministerMenu():
     buttonAddElementADMINISTER.place_forget()
     labelChooseTableADMINISTER.place_forget()
     optionMenuTablesADMINISTER.place_forget()
+    treeView.place_forget()
+    SELECTED_TABLE_NAME_2=None
+    selected_item=None
 
 
 def showCreditsMenu():
@@ -327,7 +389,7 @@ def applyFiltersButtonCREDIT():
 
 #окно с кредитами
 buttonRestructureCREDIT=tk.Button(text="Реструктуризация\nвыбранного кредита",font="Times 28",activebackground="#D9D9D9",background="#D9D9D9",command=restructureCredit)
-buttonCreditExcreptCREDIT=tk.Button(text="Выписка по\nвыбранному кредита",font="Times 28",activebackground="#D9D9D9",background="#D9D9D9",command=excreptFromCredit)
+buttonCreditExcreptCREDIT=tk.Button(text="Выписка по\nвыбранному кредиту",font="Times 28",activebackground="#D9D9D9",background="#D9D9D9",command=excreptFromCredit)
 buttonChangeGlobalCreditLimitCREDIT=tk.Button(text="Изменить глобальный\nкредитный лимит",font="Times 28",activebackground="#D9D9D9",background="#D9D9D9",command=changeGlobalCreditLimit)
 buttonCloseAccountCREDIT=tk.Button(text="Закрыть счёт",font="Times 28",activebackground="#D9D9D9",background="#D9D9D9",command=closeAccount)
 buttonGetOverallCreditRiskCREDIT=tk.Button(text="Получить общий\nкредитный риск",font="Times 28",activebackground="#D9D9D9",background="#D9D9D9",command=getOverallCreditRisk)
